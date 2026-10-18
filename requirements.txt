@@ -1,0 +1,13 @@
+pypylon>=26.0
+opencv-python>=4.10
+numpy>=2.0
+pyads>=3.5
+pylogix>=1.1
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pillow>=10.0
+# added for the LiDAR work (2026-10)
+matplotlib>=3.9
+openpyxl>=3.1
+scansegmentapi @ git+https://github.com/SICKAG/ScanSegmentAPI.git
+# exact versions that ran on the first PC: requirements-lock.txt

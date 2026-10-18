@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_VisionInspect" Id="{a1f2b3c4-0002-4e00-9000-c0ffee000002}" SpecialFunc="None">
+    <Declaration><![CDATA[// Fires the camera hardware trigger via a digital output and waits for
+// the vision PC to deliver a result over ADS (see GVL_Vision).
+//
+// Usage:
+//   fbVision(bExecute := bStartInspection, tTimeout := T#500MS);
+//   Wire fbVision.qTrigger to the DO terminal connected to the camera's
+//   opto trigger input (Line1). Pulse length is handled internally.
+//
+// Health: monitor GVL_Vision.nHeartbeat externally -- if it stops
+// changing for > 3 s the vision app is down.
+FUNCTION_BLOCK FB_VisionInspect
+VAR_INPUT
+    bExecute  : BOOL;                     // rising edge starts an inspection
+    tTimeout  : TIME := T#500MS;          // max wait for the vision result
+    tPulse    : TIME := T#10MS;           // trigger pulse width
+END_VAR
+VAR_OUTPUT
+    qTrigger  : BOOL;                     // -> DO -> camera trigger input
+    bBusy     : BOOL;
+    bDone     : BOOL;                     // result captured
+    bError    : BOOL;                     // timeout: no result from vision PC
+    bPass     : BOOL;                     // overall verdict
+    nRoiCount : USINT;
+    aRoiPass  : ARRAY[1..8] OF BOOL;
+    aMatchX   : ARRAY[1..8] OF DINT;      // pixels, full image
+    aMatchY   : ARRAY[1..8] OF DINT;
+    aScore    : ARRAY[1..8] OF REAL;
+END_VAR
+VAR
+    rtExec     : R_TRIG;
+    nLastId    : UDINT;
+    tonTimeout : TON;
+    tonPulse   : TON;
+    nState     : INT;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[rtExec(CLK := bExecute);
+
+CASE nState OF
+    0: // idle -------------------------------------------------------
+        IF rtExec.Q THEN
+            bDone   := FALSE;
+            bError  := FALSE;
+            nLastId := GVL_Vision.stResult.nResultId;
+            qTrigger := TRUE;
+            nState  := 10;
+        END_IF
+
+    10: // trigger pulse ---------------------------------------------
+        tonPulse(IN := TRUE, PT := tPulse);
+        IF tonPulse.Q THEN
+            tonPulse(IN := FALSE);
+            qTrigger := FALSE;
+            nState := 20;
+        END_IF
+
+    20: // wait for vision result ------------------------------------
+        tonTimeout(IN := TRUE, PT := tTimeout);
+        IF GVL_Vision.stResult.nResultId <> nLastId THEN
+            tonTimeout(IN := FALSE);
+            bPass     := GVL_Vision.stResult.bPass;
+            nRoiCount := GVL_Vision.stResult.nRoiCount;
+            aRoiPass  := GVL_Vision.stResult.aRoiPass;
+            aMatchX   := GVL_Vision.stResult.aMatchX;
+            aMatchY   := GVL_Vision.stResult.aMatchY;
+            aScore    := GVL_Vision.stResult.aScore;
+            bDone     := TRUE;
+            nState    := 0;
+        ELSIF tonTimeout.Q THEN
+            tonTimeout(IN := FALSE);
+            bError := TRUE;
+            nState := 0;
+        END_IF
+END_CASE
+
+bBusy := (nState <> 0);]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

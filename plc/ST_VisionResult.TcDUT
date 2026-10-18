@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_VisionResult" Id="{a1f2b3c4-0004-4e00-9000-c0ffee000004}">
+    <Declaration><![CDATA[// Written by the vision PC as ONE ADS write through a persistent handle
+// (single round trip, ~17 ms on the CX8200). nResultId is the LAST field:
+// it arrives in the same write as the data, so when it changes the rest
+// of the struct is guaranteed current.
+//
+// pack_mode 1: byte layout must match the Python side exactly
+// (struct.pack "<BB8B8i8i8ffI", 114 bytes total).
+{attribute 'pack_mode' := '1'}
+TYPE ST_VisionResult :
+STRUCT
+    bPass       : BOOL;                  // overall verdict
+    nRoiCount   : USINT;                 // number of ROIs evaluated
+    aRoiPass    : ARRAY[1..8] OF BOOL;   // per-ROI pass
+    aMatchX     : ARRAY[1..8] OF DINT;   // match center X (full-image pixels)
+    aMatchY     : ARRAY[1..8] OF DINT;   // match center Y (full-image pixels)
+    aScore      : ARRAY[1..8] OF REAL;   // match score 0..1
+    rProcTimeMs : REAL;                  // vision processing time
+    nResultId   : UDINT;                 // increments per inspection -- watch this
+END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -1,0 +1,54 @@
+{
+  "image_size": [
+    2048,
+    1536
+  ],
+  "model": "fan_bands",
+  "apex": [
+    1045.0,
+    174.0
+  ],
+  "bands": [
+    {
+      "lo": 135.5,
+      "hi": 146.0,
+      "zone": 1
+    },
+    {
+      "lo": 128.6,
+      "hi": 135.5,
+      "zone": 2
+    },
+    {
+      "lo": 117.5,
+      "hi": 128.6,
+      "zone": 3
+    },
+    {
+      "lo": 98.6,
+      "hi": 117.5,
+      "zone": 4
+    },
+    {
+      "lo": 59.3,
+      "hi": 98.6,
+      "zone": null
+    },
+    {
+      "lo": 52.8,
+      "hi": 59.3,
+      "zone": 5
+    },
+    {
+      "lo": 41.3,
+      "hi": 52.8,
+      "zone": 6
+    },
+    {
+      "lo": 28.0,
+      "hi": 41.3,
+      "zone": null
+    }
+  ],
+  "note": "CC04-IP3MV3 /cam0_0. NARROW transition-zone model (2026-10-07 v3): thin zone bands at pinch points, None=don't care gap. zone for a pixel = band whose [lo,hi) contains atan2(y-ay,x-ax)deg from apex. Zones 2,3,4 critical; 4=top-of-screw ref; 5,6 from user lines; screw-middle + far-right = don't care. PROVISIONAL - confirm placement."
+}

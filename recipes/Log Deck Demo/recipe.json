@@ -1,0 +1,92 @@
+{
+  "name": "Log Deck Demo",
+  "rois": [
+    {
+      "name": "ScrewFeeder",
+      "kind": "threshold",
+      "rect": [
+        654,
+        1331,
+        3027,
+        1055
+      ],
+      "enabled": true,
+      "template_file": "",
+      "score_threshold": 0.8,
+      "multi_match": false,
+      "max_matches": 5,
+      "color_space": "gray",
+      "lower": [
+        150,
+        0,
+        0
+      ],
+      "upper": [
+        255,
+        255,
+        255
+      ],
+      "min_percent": 10,
+      "max_percent": 100
+    },
+    {
+      "name": "TransferDeck",
+      "kind": "threshold",
+      "rect": [
+        3800,
+        1600,
+        920,
+        1520
+      ],
+      "enabled": true,
+      "template_file": "",
+      "score_threshold": 0.8,
+      "multi_match": false,
+      "max_matches": 5,
+      "color_space": "gray",
+      "lower": [
+        150,
+        0,
+        0
+      ],
+      "upper": [
+        255,
+        255,
+        255
+      ],
+      "min_percent": 20,
+      "max_percent": 100
+    },
+    {
+      "name": "Queue",
+      "kind": "threshold",
+      "rect": [
+        4600,
+        1040,
+        1112,
+        1440
+      ],
+      "enabled": true,
+      "template_file": "",
+      "score_threshold": 0.8,
+      "multi_match": false,
+      "max_matches": 5,
+      "color_space": "gray",
+      "lower": [
+        150,
+        0,
+        0
+      ],
+      "upper": [
+        255,
+        255,
+        255
+      ],
+      "min_percent": 30,
+      "max_percent": 100
+    }
+  ],
+  "camera_settings": {},
+  "reference_image": "Sample Images\\LogDeck\\ScrewFeeder.jpeg",
+  "modified": 1787682440.892805
+}

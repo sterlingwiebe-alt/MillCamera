@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_VisionInspectDI" Id="{a1f2b3c4-0003-4e00-9000-c0ffee000003}" SpecialFunc="None">
+    <Declaration><![CDATA[// Variant of FB_VisionInspect for an EXTERNALLY triggered camera:
+// a manual switch (or sensor) feeds BOTH the camera's trigger input and a
+// PLC digital input in parallel. The FB does not fire anything -- it
+// watches the DI, latches the current result id on the rising edge, and
+// waits for the vision PC to deliver the new result.
+//
+// tLatency reports switch-edge -> result-received as seen by the PLC
+// (resolution = task cycle time; includes DI filter and camera input
+// filter delays).
+//
+// Bounce-safe: re-triggers are ignored while a measurement is in flight.
+FUNCTION_BLOCK FB_VisionInspectDI
+VAR_INPUT
+    bTriggerIn : BOOL;                    // map to the DI wired to the switch
+    tTimeout   : TIME := T#500MS;         // max wait for the vision result
+END_VAR
+VAR_OUTPUT
+    bBusy      : BOOL;
+    bDone      : BOOL;                    // new result captured
+    bError     : BOOL;                    // timeout: no result from vision PC
+    bPass      : BOOL;                    // overall verdict
+    tLatency   : TIME;                    // DI edge -> result arrival
+    nRoiCount  : USINT;
+    aRoiPass   : ARRAY[1..8] OF BOOL;
+    aMatchX    : ARRAY[1..8] OF DINT;     // pixels, full image
+    aMatchY    : ARRAY[1..8] OF DINT;
+    aScore     : ARRAY[1..8] OF REAL;
+END_VAR
+VAR
+    rtTrig     : R_TRIG;
+    nLastId    : UDINT;
+    tonTimeout : TON;
+    tStart     : TIME;
+    nState     : INT;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[rtTrig(CLK := bTriggerIn);
+
+CASE nState OF
+    0: // idle: arm on DI rising edge -----------------------------------
+        IF rtTrig.Q THEN
+            bDone   := FALSE;
+            bError  := FALSE;
+            nLastId := GVL_Vision.stResult.nResultId;
+            tStart  := TIME();
+            nState  := 20;
+        END_IF
+
+    20: // wait for vision result ---------------------------------------
+        tonTimeout(IN := TRUE, PT := tTimeout);
+        IF GVL_Vision.stResult.nResultId <> nLastId THEN
+            tonTimeout(IN := FALSE);
+            tLatency  := TIME() - tStart;
+            bPass     := GVL_Vision.stResult.bPass;
+            nRoiCount := GVL_Vision.stResult.nRoiCount;
+            aRoiPass  := GVL_Vision.stResult.aRoiPass;
+            aMatchX   := GVL_Vision.stResult.aMatchX;
+            aMatchY   := GVL_Vision.stResult.aMatchY;
+            aScore    := GVL_Vision.stResult.aScore;
+            bDone     := TRUE;
+            nState    := 0;
+        ELSIF tonTimeout.Q THEN
+            tonTimeout(IN := FALSE);
+            bError := TRUE;
+            nState := 0;
+        END_IF
+END_CASE
+
+bBusy := (nState <> 0);]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

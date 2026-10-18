@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "lidar-live-view",
+      "runtimeExecutable": "C:\\Claude\\sterl\\.venvs\\camera-app\\Scripts\\python.exe",
+      "runtimeArgs": ["lidar\\live_view.py", "--port", "8200", "--cam", "cam0_1"],
+      "port": 8200
+    },
+    {
+      "name": "camera-app",
+      "runtimeExecutable": "C:\\Claude\\sterl\\.venvs\\camera-app\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"],
+      "port": 8000
+    }
+  ]
+}

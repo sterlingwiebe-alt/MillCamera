@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# virtual environments (setup.ps1 creates them outside the project, but
+# this PC has one under sterl\)
+sterl/
+.venvs/
+venv/
+.venv/
+
+# offline wheel cache (built per PC, see setup.ps1 -Offline)
+wheelhouse/
+
+# LiDAR recordings and run outputs: gigabytes of .pkl frames, camera
+# stills, CSV/JSON state written by the live tools. Keep only the small
+# calibration/background .npz files and the notes.
+lidar_recordings/
+lidar/z4captures/**
+!lidar/z4captures/*.npz
+!lidar/z4captures/interlaced/
+lidar/z4captures/interlaced/*
+!lidar/z4captures/interlaced/perf_notes.md
+*.log
+
+# editor / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

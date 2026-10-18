@@ -1,0 +1,20 @@
+{
+  "camera": {
+    "source": "sim",
+    "serial": "",
+    "trigger_line": "Line1",
+    "preview_fps": 15.0,
+    "input_filter_us": 1000.0,
+    "input_holdoff_us": 50000.0,
+    "sim_folder": "Sample Images\\LogDeckVideo",
+    "rtsp_url": ""
+  },
+  "plc": {
+    "backend": "ads",
+    "ams_net_id": "5.171.28.113.1.1",
+    "ip_address": "192.168.1.201",
+    "port": 851,
+    "heartbeat_interval_s": 1.0
+  },
+  "active_recipe": "Log Video Demo"
+}

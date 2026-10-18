@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vision Inspection</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/style.css?v=3">
+</head>
+<body>
+<header>
+  <h1>Vision Inspection</h1>
+  <nav>
+    <button data-tab="setup" class="tab active">Setup</button>
+    <button data-tab="run" class="tab">Run</button>
+    <button data-tab="review" class="tab">Review</button>
+    <button data-tab="settings" class="tab">Settings</button>
+  </nav>
+  <div id="health">
+    <span id="h-camera" class="pill">camera</span>
+    <span id="h-plc" class="pill">plc</span>
+    <span id="h-recipe" class="pill">recipe</span>
+  </div>
+</header>
+
+<!-- ============================== SETUP ============================== -->
+<section id="tab-setup" class="tabpane active">
+  <div class="cols">
+    <div class="col-main">
+      <div class="viewwrap">
+        <img id="setup-img" src="/stream?annotated=0&scale=0.5&fps=8" alt="live">
+        <canvas id="setup-canvas"></canvas>
+      </div>
+      <div class="bar">
+        <span class="hint">View:</span>
+        <button id="btn-src-live" class="srcbtn active">Live camera</button>
+        <button id="btn-src-ref" class="srcbtn">Reference image</button>
+        <button id="btn-ref-set" title="Attach a still image to this recipe so zones can be drawn without the camera">Set reference…</button>
+        <span id="src-note" class="hint"></span>
+      </div>
+      <div class="bar">
+        <span id="draw-hint" class="hint">Select an ROI and click “Draw region” or “Teach template”, then drag on the image.</span>
+        <button id="btn-test">Test inspect</button>
+        <button id="btn-swtrig">SW trigger</button>
+        <label>Exposure µs <input id="exposure" type="number" step="100" style="width:90px"></label>
+        <label>Gain dB <input id="gain" type="number" step="0.5" style="width:70px"></label>
+      </div>
+      <pre id="test-result" class="resultbox"></pre>
+    </div>
+    <div class="col-side">
+      <h3>Recipe</h3>
+      <div class="bar">
+        <select id="recipe-select"></select>
+        <button id="btn-recipe-activate">Activate</button>
+      </div>
+      <div class="bar">
+        <input id="recipe-new-name" placeholder="new recipe name">
+        <button id="btn-recipe-new">New</button>
+        <button id="btn-recipe-delete" class="danger">Delete</button>
+      </div>
+      <h3>ROIs <button id="btn-roi-add" title="Add ROI">+</button></h3>
+      <div id="roi-list"></div>
+      <button id="btn-recipe-save" class="primary wide">Save recipe</button>
+    </div>
+  </div>
+</section>
+
+<!-- =============================== RUN =============================== -->
+<section id="tab-run" class="tabpane">
+  <div class="cols">
+    <div class="col-main">
+      <div class="viewwrap">
+        <img id="run-img" src="" alt="run view">
+      </div>
+    </div>
+    <div class="col-side">
+      <button id="btn-run-toggle" class="primary wide">START RUN</button>
+      <div id="run-verdict" class="verdict">—</div>
+      <table class="kv">
+        <tr><td>Total</td><td id="c-total">0</td></tr>
+        <tr><td>Pass</td><td id="c-pass">0</td></tr>
+        <tr><td>Fail</td><td id="c-fail">0</td></tr>
+        <tr><td>Last time</td><td id="c-time">—</td></tr>
+        <tr><td>Result ID</td><td id="c-rid">—</td></tr>
+      </table>
+      <button id="btn-counters-reset">Reset counters</button>
+      <h3>Logging</h3>
+      <div class="bar">
+        <select id="log-mode">
+          <option value="off">Off</option>
+          <option value="failures">Failures only</option>
+          <option value="next_n">Next N samples</option>
+        </select>
+        <input id="log-count" type="number" value="25" style="width:70px">
+        <button id="btn-log-apply">Apply</button>
+      </div>
+      <div id="log-status" class="hint"></div>
+      <h3>Last result</h3>
+      <pre id="run-result" class="resultbox"></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== REVIEW ============================= -->
+<section id="tab-review" class="tabpane">
+  <div class="cols">
+    <div class="col-main">
+      <div class="viewwrap">
+        <img id="review-img" src="" alt="review image">
+      </div>
+    </div>
+    <div class="col-side">
+      <h3>Sample review</h3>
+      <div class="bar">
+        <input id="review-folder" placeholder="folder (e.g. Sample Images or logs\2026-08-07)" style="flex:1">
+      </div>
+      <button id="btn-review-run" class="primary wide">Run recipe on folder</button>
+      <div id="review-summary" class="hint"></div>
+      <div id="label-panel" style="display:none">
+        <h3>Categorize</h3>
+        <div class="hint" id="label-current">select an image below</div>
+        <div id="cat-buttons" class="bar"></div>
+        <div class="bar">
+          <input id="cat-new" placeholder="new category" style="width:130px">
+          <select id="cat-expect">
+            <option value="">no expectation</option>
+            <option value="pass">should PASS</option>
+            <option value="fail">should FAIL</option>
+          </select>
+          <button id="btn-cat-add">Add</button>
+        </div>
+      </div>
+      <div id="review-list"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= SETTINGS ============================ -->
+<section id="tab-settings" class="tabpane">
+  <div class="cols">
+    <div class="col-side">
+      <h3>Camera</h3>
+      <label>Source
+        <select id="cfg-cam-source">
+          <option value="basler">Basler (real camera)</option>
+          <option value="rtsp">IP camera (RTSP stream)</option>
+          <option value="sim">Simulated (folder)</option>
+        </select>
+      </label>
+      <label>RTSP url (IP camera) <input id="cfg-cam-rtsp" placeholder="rtsp://user:pass@192.168.1.x:554/..."></label>
+      <label>Serial (blank = first found) <input id="cfg-cam-serial"></label>
+      <label>Trigger line
+        <select id="cfg-cam-line">
+          <option>Line1</option><option>Line2</option>
+          <option>Line3</option><option>Line4</option>
+        </select>
+      </label>
+      <label>Sim folder <input id="cfg-cam-simfolder"></label>
+      <button id="btn-cam-apply" class="primary">Apply &amp; restart camera</button>
+      <div id="cam-info" class="hint"></div>
+    </div>
+    <div class="col-side">
+      <h3>PLC (Beckhoff CX8200)</h3>
+      <label>Backend
+        <select id="cfg-plc-backend">
+          <option value="mock">Mock (no PLC)</option>
+          <option value="ads">Beckhoff ADS</option>
+          <option value="eip">Rockwell EtherNet/IP</option>
+        </select>
+      </label>
+      <label>AMS Net ID (ADS) <input id="cfg-plc-ams" placeholder="e.g. 5.51.123.86.1.1"></label>
+      <label>IP address <input id="cfg-plc-ip" placeholder="controller IP"></label>
+      <label>ADS port <input id="cfg-plc-port" type="number" value="851"></label>
+      <label>Slot (EtherNet/IP) <input id="cfg-plc-slot" type="number" value="0"></label>
+      <button id="btn-plc-apply" class="primary">Apply &amp; reconnect PLC</button>
+      <button id="btn-plc-test">Send test result</button>
+      <pre id="plc-info" class="resultbox"></pre>
+    </div>
+  </div>
+</section>
+
+<script src="/static/app.js?v=3"></script>
+</body>
+</html>

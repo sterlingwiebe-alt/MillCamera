@@ -1,0 +1,64 @@
+{
+  "name": "Log Video Demo",
+  "rois": [
+    {
+      "name": "ScrewFeeder",
+      "kind": "threshold",
+      "rect": [
+        100,
+        350,
+        1100,
+        650
+      ],
+      "enabled": true,
+      "template_file": "",
+      "score_threshold": 0.8,
+      "multi_match": false,
+      "max_matches": 5,
+      "color_space": "gray",
+      "lower": [
+        150,
+        0,
+        0
+      ],
+      "upper": [
+        255,
+        255,
+        255
+      ],
+      "min_percent": 12,
+      "max_percent": 100
+    },
+    {
+      "name": "Queue",
+      "kind": "threshold",
+      "rect": [
+        1250,
+        350,
+        650,
+        450
+      ],
+      "enabled": true,
+      "template_file": "",
+      "score_threshold": 0.8,
+      "multi_match": false,
+      "max_matches": 5,
+      "color_space": "gray",
+      "lower": [
+        150,
+        0,
+        0
+      ],
+      "upper": [
+        255,
+        255,
+        255
+      ],
+      "min_percent": 25,
+      "max_percent": 100
+    }
+  ],
+  "camera_settings": {},
+  "reference_image": "Sample Images\\LogDeckVideo\\t030s.jpg",
+  "modified": 1787611881.8102715
+}

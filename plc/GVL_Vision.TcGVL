@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <GVL Name="GVL_Vision" Id="{a1f2b3c4-0001-4e00-9000-c0ffee000001}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'linkalways'}
+VAR_GLOBAL
+    // Written by the vision PC over ADS.
+    nHeartbeat : UDINT;             // increments ~1/s while the vision app runs
+    stResult   : ST_VisionResult;   // full result, one atomic ADS write;
+                                    // stResult.nResultId changing = new result
+END_VAR]]></Declaration>
+  </GVL>
+</TcPlcObject>

@@ -1,0 +1,63 @@
+{
+  "name": "Ticket Demo",
+  "rois": [
+    {
+      "name": "Label",
+      "kind": "template",
+      "rect": [
+        1200,
+        100,
+        1248,
+        900
+      ],
+      "enabled": true,
+      "template_file": "tpl_Label.png",
+      "score_threshold": 0.8,
+      "multi_match": false,
+      "max_matches": 5,
+      "color_space": "gray",
+      "lower": [
+        0,
+        0,
+        0
+      ],
+      "upper": [
+        255,
+        255,
+        255
+      ],
+      "min_percent": 50,
+      "max_percent": 100
+    },
+    {
+      "name": "BrightZone",
+      "kind": "threshold",
+      "rect": [
+        300,
+        150,
+        1500,
+        500
+      ],
+      "enabled": true,
+      "template_file": "",
+      "score_threshold": 0.8,
+      "multi_match": false,
+      "max_matches": 5,
+      "color_space": "gray",
+      "lower": [
+        90,
+        0,
+        0
+      ],
+      "upper": [
+        255,
+        255,
+        255
+      ],
+      "min_percent": 20,
+      "max_percent": 100
+    }
+  ],
+  "camera_settings": {},
+  "modified": 1786637955.902262
+}
