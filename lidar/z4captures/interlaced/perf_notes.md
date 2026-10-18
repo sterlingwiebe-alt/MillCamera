@@ -116,6 +116,28 @@ fewer rounds, i.e. a behaviour change.
 3. `interlace_capture.py --replay cap_01_052913.pkl` runs and reports as
    before (single 321 mm / pooled 344 mm on that capture).
 
+## First live run (2026-10-17)
+
+Capture tool started 18:56 with this code, deck idle. Published state age
+sampled every 5-10 s for 15 min: 0.02-0.20 s (before: 0.5-2.5 s). No
+errors. Process CPU still ~94% of one core; py-spy (20 s, 100 Hz, 1993
+samples) attributes it:
+
+| thread | share | where |
+|---|---|---|
+| FrameBuffer.run (UDP receive) | 79 % | `scansegmentapi/compact.py` `_read_beam_data` lines 293-306: `struct.unpack_from` per beam, element-wise assignment of 3 echoes x (distance, rssi), theta, property; ~11.5k beams per 20 Hz frame |
+| FlowTracker.run | 21 % | `_fit_group` etc. (idle deck, few arcs) |
+| main / PLC out / optimizer tap | < 1 % | |
+
+So the SICK parser is now the dominant cost and the GIL budget is tight:
+parser 75 % + tracker 20-45 % (idle to busy deck) exceeds one core.
+Options, in order of preference: (1) vectorise `_read_beam_data` with one
+`numpy.frombuffer` structured-dtype read per module (same arithmetic per
+element: `uint16 * DistanceScalingFactor`, `(theta - 16384) / 5215.0`),
+patched in from `lidar/` without editing the installed package, verified
+against the original parser on captured raw payloads; (2) move receive +
+parse into a separate process (the PC has 4 hardware threads).
+
 ## Notes / options not taken
 
 - Caches: `_FIT_CACHE` (8192 fits, cleared when full), `_PTS_CACHE` (64

@@ -157,15 +157,25 @@ Verified on this PC:
 - The optimised tracker gives identical results to the original on 278
   recorded frames and runs at ~22 ms per frame offline.
 
+- First live run of the optimised tracker, started 2026-10-17 18:56 with
+  the deck idle: published state age 0.02-0.20 s (was 0.5-2.5 s), no
+  errors in the first 15 minutes. The process still takes ~94% of one
+  core: py-spy shows 79% of that in the SICK library's packet parser
+  (`scansegmentapi/compact.py` `_read_beam_data`, a per-beam Python loop
+  in the UDP receive thread) and 21% in the tracker. That parser is the
+  next bottleneck; see `lidar/z4captures/interlaced/perf_notes.md`.
+
 NOT yet verified:
 
-- The optimised tracker has not run live. The capture tool last ran with
-  the old code until the 2026-10-16 reboot; the new code has had no live
-  runtime on this PC. Whether the state lag and fresh-flag flicker are
-  gone in production is expected from the offline numbers, not observed.
+- The tracker under load: the 2026-10-17 run so far only saw an idle
+  deck. With logs moving the tracker needs more of the core and competes
+  with the parser for the interpreter lock, so lag may creep back until
+  the parser is sped up or moved to its own process.
 - Long-term stability on this PC (hours of operation, memory, the PLC
-  link): the only live run so far was 2026-10-15 (498 passes) with the
-  old code and ended with PLC connection failures around the reboot.
+  link): the only long live run so far was 2026-10-15 (498 passes) with
+  the old code; it ran until the PC was restarted on 2026-10-16 08:50
+  (user-initiated restart that ended in an unclean power-off; the tool
+  itself did not crash).
 - Unattended restart after a reboot (see section 7).
 
 Until the first long live run with the current code has been watched, do
