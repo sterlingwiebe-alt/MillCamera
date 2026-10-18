@@ -150,6 +150,44 @@ to 2-3 (`scripts/start_mill.ps1`) did: median 0.13 s, p90 0.21 s, max
 0.80 s, none over 1 s. The margin is thin: the parser (above) is the lever
 if the line-running load brings the stalls back.
 
+## Live view idle decode (2026-10-17)
+
+`live_view.py` decoded + resized the camera substream around the clock,
+viewer or not (the browser only receives the MJPEG re-encode; the decode
+is server-side, so watching from another PC changed nothing). Now the
+MJPEG response counts itself as a camera client for as long as it is being
+sent, and the `Camera` thread holds the RTSP capture open only while that
+count is > 0, dropping it 5 s after the last client leaves and reopening
+on the next one. Until the first decoded frame the stream carries the
+zone overlay on a black picture with a "camera starting..." label.
+
+Measured on the dev PC (interpreter process, % of one core; the venv
+`python.exe` is a launcher, the child was measured), `--cam cam0_1`:
+
+| state | before | after |
+|---|---|---|
+| no client, 30 s | 29.9 % | 0.1 % |
+| one MJPEG client (urllib, 10 fps), 25 s | 40.7 % | 38.9 % |
+| 8 s after the client left, 30 s | (29.9 %) | 0.4 % |
+
+Latency for a client on `127.0.0.1`: first overlay frame 0.2 s, camera
+picture 1.2-2.5 s after that (RTSP open + first decoded frame). Reconnect
+after the grace period behaves the same. Expect the mill PC idle figure to
+drop from the 25-35 % above to ~0 once the MillCamera task is restarted
+with this version (not yet done; the supervised instance still runs the
+old code).
+
+Gotcha found on the way: a `finally` in the sync MJPEG generator did NOT
+run on client disconnect (decode stayed at 25 %): uvicorn 0.52 advertises
+ASGI 2.3, so Starlette cancels the sending task and the abandoned
+generator is left for the cyclic GC. The count therefore lives in a
+`StreamingResponse` subclass whose `__call__` wraps the whole send in
+try/finally (and closes the generator explicitly).
+
+Note for measuring with `urllib` on Windows: `localhost` costs a 2 s
+IPv6-first connect timeout against a server bound to `0.0.0.0`; use
+`127.0.0.1`.
+
 ## Notes / options not taken
 
 - Caches: `_FIT_CACHE` (8192 fits, cleared when full), `_PTS_CACHE` (64

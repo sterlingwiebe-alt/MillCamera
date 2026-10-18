@@ -5,7 +5,8 @@ progress, the last optimizer pairing and the running score.
 Reads the camera over RTSP itself and the LiDAR state from
 <dump>/live_state.json, which the flow tracker inside interlace_capture.py
 rewrites ~10x per second. So it runs ALONGSIDE the capture tool without
-touching the LiDAR port.
+touching the LiDAR port. The camera is decoded only while a browser has
+/stream open (see Camera); with no viewer the process is idle.
 
     python lidar/live_view.py                 # http://localhost:8200
     python lidar/live_view.py --port 8201 --dump lidar/z4captures/interlaced
@@ -44,25 +45,61 @@ SHORT = {"1_OutfeedConveyor": "Z1 outfeed", "2_CamWaiting": "Z2 cam wait",
 
 
 class Camera(threading.Thread):
+    """Decodes the RTSP stream only while someone is watching /stream.
+
+    Decoding + resizing 640x480 at 30 fps costs 25-35 % of a core on the
+    mill PC, and it was paid around the clock whether or not a browser was
+    open. Now the MJPEG generator counts its clients (acquire/release) and
+    this thread holds the capture open only while that count is > 0,
+    dropping it GRACE seconds after the last client leaves. `frame` is
+    None whenever the capture is closed, so the generator falls back to the
+    blank picture with the zone overlay until the stream is up again.
+    """
+    GRACE = 5.0          # s to keep the stream open after the last client left
+
     def __init__(self, url):
         super().__init__(daemon=True)
         self.url = url
         self.frame = None
         self.t = 0.0
+        self.clients = 0
+        self._lock = threading.Lock()
+        self._wanted = threading.Event()   # set whenever a client arrives
+
+    def acquire(self):
+        with self._lock:
+            self.clients += 1
+        self._wanted.set()
+
+    def release(self):
+        with self._lock:
+            self.clients -= 1
 
     def run(self):
         os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS",
                               "rtsp_transport;tcp|stimeout;5000000")
         while True:
+            while self.clients <= 0:        # nobody watching: no decode at all
+                self._wanted.wait()
+                self._wanted.clear()
             cap = cv2.VideoCapture(self.url, cv2.CAP_FFMPEG)
+            idle_since = None
             while cap.isOpened():
                 ok, fr = cap.read()
                 if not ok:
                     break
                 self.frame = cv2.resize(fr, (OUT_W, OUT_H))
                 self.t = time.time()
+                if self.clients > 0:
+                    idle_since = None
+                elif idle_since is None:
+                    idle_since = time.time()
+                elif time.time() - idle_since > self.GRACE:
+                    break
             cap.release()
-            time.sleep(2.0)
+            self.frame = None
+            if self.clients > 0:            # stream dropped while watched: reconnect
+                time.sleep(2.0)
 
 
 class State(threading.Thread):
@@ -283,7 +320,10 @@ def main():
     def gen():
         blank = np.zeros((OUT_H, OUT_W, 3), np.uint8)
         while True:
-            fr = cam.frame if cam.frame is not None else blank
+            fr = cam.frame
+            waiting = fr is None            # capture not open (yet): overlay on black
+            if waiting:
+                fr = blank
             try:
                 img = draw(fr, st.state, apex, bands)
             except Exception as e:          # noqa: BLE001 -- keep streaming the bare camera frame
@@ -291,14 +331,35 @@ def main():
                 if n in (1, 10, 100) or n % 1000 == 0:
                     print(f"live view: draw failed ({n}x): {type(e).__name__}: {e}", flush=True)
                 img = fr.copy()
+            if waiting:
+                _label(img, "camera starting...", (OUT_W // 2 - 110, OUT_H // 2),
+                       (200, 200, 200), 0.8)
             ok, jpg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 80])
             if ok:
                 yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpg.tobytes() + b"\r\n")
             time.sleep(0.1)
 
+    class CountedStream(StreamingResponse):
+        """StreamingResponse that counts itself as a camera client for as long
+        as it is being sent. The count is NOT kept in gen(): on a client
+        disconnect Starlette cancels the sending task and abandons the sync
+        generator without closing it, so a `finally` in gen() does not run
+        (measured: the decode kept going at 25 % after the browser left).
+        """
+        async def __call__(self, scope, receive, send):
+            cam.acquire()                   # starts the RTSP decode if it is not running
+            try:
+                await super().__call__(scope, receive, send)
+            finally:
+                cam.release()               # Camera drops the stream GRACE s later
+                try:
+                    await self.body_iterator.aclose()   # free the abandoned generator now
+                except Exception:           # noqa: BLE001
+                    pass
+
     @app.get("/stream")
     def stream():
-        return StreamingResponse(gen(), media_type="multipart/x-mixed-replace; boundary=frame")
+        return CountedStream(gen(), media_type="multipart/x-mixed-replace; boundary=frame")
 
     print(f"live view: http://localhost:{args.port}", flush=True)
     uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="warning")
