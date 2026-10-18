@@ -86,14 +86,17 @@ in the code:
 Open a new shell afterwards (and restart the Claude desktop app if you use
 its launch entries).
 
-The camera offers the same picture as several RTSP streams at different
-sizes: `cam0_0` is the full 2048x1536 stream (`lidar/camera_zones.json` is
-calibrated for it); `cam0_1` and `cam0_2` are smaller substreams (on the
-mill PC they came up as 640x480 and 320x240; check with the camera's web
-page or `ffprobe` if it matters). `.claude\launch.json` starts the live
-view on `cam0_1` because decoding the full stream pinned the mill PC's
-CPU; the capture tool still grabs its stills from `cam0_0`, so the zone
-calibration applies to them.
+The camera offers the same picture as three RTSP streams (measured
+2026-10-17 by opening each one with OpenCV):
+
+| stream | size | used by |
+|---|---|---|
+| `cam0_0` | 2048x1536, 30 fps | capture tool stills; `lidar/camera_zones.json` is calibrated for this size |
+| `cam0_1` | 640x480, 30 fps | live view (`.claude\launch.json`), chosen because decoding the full stream pinned the mill PC's CPU |
+| `cam0_2` | 320x240, 30 fps | unused |
+
+There is no `cam0_3`. The substream only changes what the live view
+decodes; measurements and the zone calibration are unaffected.
 
 ## 6. PLC
 
@@ -117,15 +120,53 @@ terminal closing, with its console going to a log:
 
     Start-Process -FilePath <venv>\Scripts\python.exe -ArgumentList "lidar\interlace_capture.py","--ack","--plc-out" -WorkingDirectory C:\Claude -RedirectStandardOutput lidar\z4captures\interlaced\capture_console.log -RedirectStandardError lidar\z4captures\interlaced\capture_console.err.log
 
-Healthy signs: the log shows "flow mode ON", "PLC OUT: writing
+Signs to look for: the log shows "flow mode ON", "PLC OUT: writing
 Vision_Transport[0..39]" and "ARMED on 'Vision_Capture'"; the live view's
 LiDAR state is not marked stale; `Vision_Transport[0]` (fresh flag) stays
-at 1.
+at 1 while the line runs. "PLC OUT write failed: Connection failure" in
+the log means the PLC Net link dropped (the tool keeps retrying).
 
-## 8. Performance notes for a slow PC
+Nothing starts the capture tool automatically. After a reboot it is down
+until someone starts it again (this is what happened on 2026-10-16: the
+mill PC rebooted at 09:07 and the tool stayed off). A Scheduled Task or a
+startup shortcut running the `Start-Process` line above would fix that.
 
-The tracker needs ~22 ms per 20 Hz frame after the 2026-10-15
-optimisation (`lidar/z4captures/interlaced/perf_notes.md`); before it,
-148 ms, which is why the mill PC showed a 0.5-2.5 s state lag. Keep the
-full-resolution live view off the tracker PC. `lidar/perf_replay.py`
-replays recordings offline to time the tracker on any machine.
+## 8. Performance on a slow PC
+
+The tracker needed 148 ms per 20 Hz frame on the mill PC with the original
+code (state lag 0.5-2.5 s, fresh flag flickering). The 2026-10-15
+optimisation of `lidar/arcfit.py`, `segment.py` and `flow_track.py`
+brought that to ~22 ms per frame on the same PC with bit-identical
+results, measured by replaying recordings offline
+(`lidar/z4captures/interlaced/perf_notes.md`, harness
+`lidar/perf_replay.py`). Keep the full-resolution live view off the
+tracker PC regardless.
+
+## 9. Status of the mill PC (2026-10-17)
+
+Verified on this PC:
+
+- Python 3.12 + venv work; the SICK package is in the venv (copied from
+  the first PC, not reinstalled).
+- LiDAR Compact UDP frames arrive at 192.168.0.10:2115 at 19.6 frames/s
+  with no parse errors (`lidar\capture.py --seconds 4`, 2026-10-17, after
+  the sensor's target was set to this PC).
+- Camera streams open with the `CAM_URL` login at the sizes above.
+- PLC (192.168.1.20:44818), camera and LiDAR web UI are reachable.
+- Firewall: UDP 2115 Allow rule present; python.exe rules set to Allow.
+- The optimised tracker gives identical results to the original on 278
+  recorded frames and runs at ~22 ms per frame offline.
+
+NOT yet verified:
+
+- The optimised tracker has not run live. The capture tool last ran with
+  the old code until the 2026-10-16 reboot; the new code has had no live
+  runtime on this PC. Whether the state lag and fresh-flag flicker are
+  gone in production is expected from the offline numbers, not observed.
+- Long-term stability on this PC (hours of operation, memory, the PLC
+  link): the only live run so far was 2026-10-15 (498 passes) with the
+  old code and ended with PLC connection failures around the reboot.
+- Unattended restart after a reboot (see section 7).
+
+Until the first long live run with the current code has been watched, do
+not treat this PC as proven.
