@@ -23,35 +23,40 @@ differs.
 
 ## 2. Network adapters
 
-Two wired adapters, static IPv4, no gateway needed on either:
+The devices live on two subnets, so the PC needs one wired adapter with a
+static IPv4 address in each. The DEVICE addresses are what the tools know
+(`--ip 192.168.1.20` for the PLC, `192.168.0.2` for the camera, both
+defaults in the code); the PC's own addresses are not referenced anywhere
+and can be any free host in the subnet.
 
-| adapter (name it like this) | this PC | devices on it |
+| subnet | devices (fixed) | PC address |
 |---|---|---|
-| Camera Net | 192.168.0.10 /24 | IP camera 192.168.0.2 (RTSP :554), multiScan165 LiDAR 192.168.0.1 (web UI) |
-| PLC Net | 192.168.1.240 /24 | ControlLogix 1756-L83E 192.168.1.20, slot 0 |
+| 192.168.0.0/24 ("Camera Net") | IP camera 192.168.0.2 (RTSP :554), multiScan165 LiDAR 192.168.0.1 (web UI) | any free address; this is the one the LiDAR must be told to stream to (section 3). Mill PC: 192.168.0.10 |
+| 192.168.1.0/24 ("PLC Net") | ControlLogix 1756-L83E 192.168.1.20, slot 0 | any free address. Mill PC happens to be 192.168.1.240 |
 
-The addresses are hard-coded defaults in the tools (`--ip 192.168.1.20`,
-camera `192.168.0.2`), so keep the device side the same and only the PC
-addresses need to exist. Windows puts new wired networks on the Public
-profile; that is fine, the firewall rules below cover it.
+No gateway is needed on either. Windows puts new wired networks on the
+Public firewall profile; that is fine, the rules in section 4 cover it.
 
 ## 3. LiDAR UDP target (the sensor pushes to the PC)
 
-The multiScan165 streams Compact-format UDP to ONE configured address. It
-must be this PC:
+The multiScan165 does not answer requests; it streams Compact-format UDP
+to ONE address configured inside the sensor. After a move that address
+still points at the OLD PC, and the new PC sees no frames and no error.
 
-1. Open the sensor web UI at http://192.168.0.1 from the Camera Net adapter.
-2. Application -> Data output: set the target to this PC's Camera Net IP
-   (192.168.0.10), port 2115, Compact format. The first PC was
-   192.168.0.252; forgetting this step means "no frames" with no error.
-3. Leave interlacing x4 on (the pooled analysis in `lidar/interlace.py`
-   expects it).
+1. Open the sensor's web UI (http://192.168.0.1) in a browser on the new PC.
+2. In the measurement data output settings (SOPAS web UI; on the mill PC
+   it was under the Application area, look for "data output" / "Compact"),
+   set: format Compact, protocol UDP, target IP = the new PC's address on
+   the 192.168.0.x adapter, port 2115. Done on the mill PC with
+   192.168.0.10 on 2026-10-15 and again 2026-10-17.
+3. Leave interlacing x4 on; `lidar/interlace.py` pools 4 consecutive
+   frames and expects it.
 
 Check:
 
     python lidar\capture.py --seconds 4 --label smoke
 
-should report ~20 frames/s arriving.
+should report frames arriving at ~20 per second.
 
 ## 4. Firewall
 
@@ -79,10 +84,16 @@ in the code:
     setx CAM_URL rtsp://USER:PASSWORD@192.168.0.2:554/cam0_0
 
 Open a new shell afterwards (and restart the Claude desktop app if you use
-its launch entries). Streams: `cam0_0` full 2048x1536, `cam0_1` 640x480,
-`cam0_2` 320x240. `.claude\launch.json` starts the live view on `cam0_1`
-because decoding the full stream pinned the mill PC's CPU; the capture
-tool still grabs full-resolution stills from `cam0_0`.
+its launch entries).
+
+The camera offers the same picture as several RTSP streams at different
+sizes: `cam0_0` is the full 2048x1536 stream (`lidar/camera_zones.json` is
+calibrated for it); `cam0_1` and `cam0_2` are smaller substreams (on the
+mill PC they came up as 640x480 and 320x240; check with the camera's web
+page or `ffprobe` if it matters). `.claude\launch.json` starts the live
+view on `cam0_1` because decoding the full stream pinned the mill PC's
+CPU; the capture tool still grabs its stills from `cam0_0`, so the zone
+calibration applies to them.
 
 ## 6. PLC
 
