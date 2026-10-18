@@ -115,21 +115,56 @@ path):
     python lidar\live_view.py --port 8200 --cam cam0_1     # live view, http://localhost:8200
     python lidar\light_bank.py --interval 300 --no-lidar   # camera light bank (optional)
 
-On the mill PC the capture tool is started detached so it survives the
-terminal closing, with its console going to a log:
+### Automatic start (installed on the mill PC 2026-10-17)
 
-    Start-Process -FilePath <venv>\Scripts\python.exe -ArgumentList "lidar\interlace_capture.py","--ack","--plc-out" -WorkingDirectory C:\Claude -RedirectStandardOutput lidar\z4captures\interlaced\capture_console.log -RedirectStandardError lidar\z4captures\interlaced\capture_console.err.log
+`scripts\start_mill.ps1` is a supervisor: it reads `local.env`, waits up to
+2 min for the PLC and LiDAR to answer, starts the capture tool and the live
+view with their consoles going to `lidar\z4captures\interlaced\
+capture_console.log` / `liveview.log` (older runs kept with a timestamp),
+and restarts either program if it exits (5 s back-off, doubling to 60 s,
+reset after 5 min of healthy running). Its own log is `supervisor.log`.
 
-Signs to look for: the log shows "flow mode ON", "PLC OUT: writing
-Vision_Transport[0..39]" and "ARMED on 'Vision_Capture'"; the live view's
-LiDAR state is not marked stale; `Vision_Transport[0]` (fresh flag) stays
-at 1 while the line runs. "PLC OUT write failed: Connection failure" in
-the log means the PLC Net link dropped (the tool keeps retrying).
+The scheduled task **MillCamera** runs it at system startup (+30 s), as
+the Administrator account whether anyone is logged in or not, with no time
+limit, and Task Scheduler restarts the task itself if it ever ends. Install
+on a new PC from an elevated PowerShell:
 
-Nothing starts the capture tool automatically. After a reboot it is down
-until someone starts it again (this is what happened on 2026-10-16: the
-mill PC rebooted at 09:07 and the tool stayed off). A Scheduled Task or a
-startup shortcut running the `Start-Process` line above would fix that.
+    Copy-Item local.env.example local.env     # then put the real CAM_URL in it
+    .\scripts\install_autostart.ps1
+
+Day to day:
+
+    Start-ScheduledTask -TaskName MillCamera                     # start now (also happens at boot)
+    powershell -ExecutionPolicy Bypass -File scripts\stop_mill.ps1   # stop everything
+    Get-ScheduledTask MillCamera | Select State                  # Running = supervisor alive
+    Get-Content lidar\z4captures\interlaced\supervisor.log -Tail 20
+
+So after a reboot there is nothing to do: about a minute after Windows is
+up the PLC output and http://<pc>:8200 are back. To run the tools by hand
+instead, stop the task first (two capture tools would fight over UDP 2115
+and both write the PLC).
+
+Signs to look for: `capture_console.log` shows "flow mode ON", "PLC OUT:
+writing Vision_Transport[0..39]" and "ARMED on 'Vision_Capture'"; the live
+view's LiDAR state is not marked stale; `Vision_Transport[0]` (fresh flag)
+stays at 1 while the line runs. "PLC OUT write failed: Connection failure"
+means the PLC Net link dropped (the tool keeps retrying).
+
+The supervisor also places the processes: Task Scheduler starts everything
+at BelowNormal priority, and on this 2-core/4-thread PC the live view's
+video decoding stalled the tracker for ~2 s at a time (state age spikes
+to 1.9 s = fresh flag flicker) even after fixing the priority. So the
+capture tool runs AboveNormal pinned to logical CPUs 0-1 (one physical
+core) and the live view BelowNormal on CPUs 2-3. Measured 2026-10-17 over
+90 s each, deck idle: no live view, median 0.12 s / max 0.66 s; live view
+without the core split, max 1.9 s with several samples over 1 s; live
+view with the split, median 0.13 s / p90 0.21 s / max 0.80 s, none over
+1 s. The live view costs 25-35% of a core alone, ~50% with two browsers
+connected (9 fps each).
+
+Verified 2026-10-17: starting the task by hand brings both programs up
+within 2 s; killing the live view process made the supervisor restart it
+(back-off 5 s, 10 s, ... 60 s).
 
 ## 8. Performance on a slow PC
 
@@ -167,16 +202,20 @@ Verified on this PC:
 
 NOT yet verified:
 
-- The tracker under load: the 2026-10-17 run so far only saw an idle
-  deck. With logs moving the tracker needs more of the core and competes
-  with the parser for the interpreter lock, so lag may creep back until
-  the parser is sped up or moved to its own process.
+- The tracker under load: the 2026-10-17 runs only saw an idle deck.
+  With logs moving the tracker needs more of its core and competes with
+  the packet parser for the interpreter lock, so lag may creep back until
+  the parser is sped up or moved to its own process. Watch the state age
+  (`live_state.json` "t" vs now, or the live view's stale marker) during
+  the first production shift; samples over 1 s mean the fresh flag
+  flickers.
 - Long-term stability on this PC (hours of operation, memory, the PLC
   link): the only long live run so far was 2026-10-15 (498 passes) with
   the old code; it ran until the PC was restarted on 2026-10-16 08:50
   (user-initiated restart that ended in an unclean power-off; the tool
   itself did not crash).
-- Unattended restart after a reboot (see section 7).
+- The automatic start has been tested by starting the task by hand, not
+  yet by an actual reboot of the mill PC.
 
 Until the first long live run with the current code has been watched, do
 not treat this PC as proven.

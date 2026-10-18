@@ -14,6 +14,9 @@ venv/
 # offline wheel cache (built per PC, see setup.ps1 -Offline)
 wheelhouse/
 
+# per-PC settings incl. the camera login (scripts\start_mill.ps1 reads it)
+local.env
+
 # LiDAR recordings and run outputs: gigabytes of .pkl frames, camera
 # stills, CSV/JSON state written by the live tools. Keep only the small
 # calibration/background .npz files and the notes.

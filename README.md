@@ -19,8 +19,13 @@ stream name (`cam0_1`, the lighter substream for the live view).
 
 ## Running
 
+On the mill PC the scheduled task `MillCamera` runs `scripts\start_mill.ps1`
+at boot, which starts and supervises the capture tool and the live view
+(install: `scripts\install_autostart.ps1`; stop: `scripts\stop_mill.ps1`;
+details in MOVE.md). By hand:
+
     python lidar\interlace_capture.py --ack --plc-out   # capture tool + flow tracker + PLC output
-    python lidar\live_view.py --port 8200               # live view, http://localhost:8200
+    python lidar\live_view.py --port 8200 --cam cam0_1  # live view, http://localhost:8200
     python -m uvicorn app.main:app --port 8000          # camera app
 
 ## Layout

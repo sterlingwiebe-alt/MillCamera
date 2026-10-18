@@ -138,6 +138,18 @@ patched in from `lidar/` without editing the installed package, verified
 against the original parser on captured raw payloads; (2) move receive +
 parse into a separate process (the PC has 4 hardware threads).
 
+## Live view contention (2026-10-17)
+
+With `live_view.py` (640x480 substream decode + resize, 25-35% of a core)
+running on the same PC, the capture tool's published state stalled for
+~2 s roughly twice a minute (90 s samples at 2 Hz: max 1.9 s, several
+over 1 s) while without it the max was 0.66 s. Process priority alone did
+not fix it (the two threads of a hyperthreaded core share execution
+resources). Pinning the capture tool to logical CPUs 0-1 and the live view
+to 2-3 (`scripts/start_mill.ps1`) did: median 0.13 s, p90 0.21 s, max
+0.80 s, none over 1 s. The margin is thin: the parser (above) is the lever
+if the line-running load brings the stalls back.
+
 ## Notes / options not taken
 
 - Caches: `_FIT_CACHE` (8192 fits, cleared when full), `_PTS_CACHE` (64
