@@ -251,6 +251,14 @@ class FlowTracker:
                 # must not count (the old 0.23 m limit let them through)
                 if not (PRES_R_LO <= r <= PRES_R_HI and y0 <= c3[1] <= y1):
                     continue
+                # ... and the run's own points must lie in the band as well.
+                # A partial arc on the flank of a log in the NEXT zone fits a
+                # larger circle whose centre is pushed away from its points,
+                # across the zone border: on 2026-10-19 the lower flank of a
+                # piece in zone 3 (points y -1.26..-1.40) gave 300-430 mm
+                # "arcs" centred at -1.5, lighting zone 2 with nothing there.
+                if not (y0 <= float(np.median(run[:, 1])) <= y1):
+                    continue
                 # zone 3: the parked cam lobe reads 148-175 mm at y -1.08;
                 # arcs that close to it count only if clearly log-sized
                 if z == "3_CamStaging" and c3[1] > Z3_LOBE_Y and r * 2000 < Z3_LOBE_DIA:
