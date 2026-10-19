@@ -3,9 +3,10 @@ Per frame: qualifying arcs = log radius, centre in band, points-median in band
 (the current rule). Then simulate the 5-frame history for several rules and
 print the fraction of frames called present per capture."""
 import glob, pickle, sys
+from pathlib import Path
 from collections import deque
 import numpy as np
-sys.path.insert(0, r"C:\Claude")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from lidar.flow_track import FlowTracker, PRES_R_LO, PRES_R_HI   # noqa: E402
 from lidar.arcfit import zone_round_runs                            # noqa: E402
 
@@ -32,7 +33,7 @@ RULES = {
     ">=1 arc 3 of 5, y spread<=0.06":  lambda h: (lambda ys: len(ys) >= 3 and max(ys) - min(ys) <= 0.06)(
                                             [np.median([y for y, _, _ in a]) for a in h if a]),
 }
-pkls = sys.argv[1:] or sorted(glob.glob(r"C:\Claude\lidar\z4captures\interlaced\cap_*.pkl"))
+pkls = sys.argv[1:] or sorted(glob.glob(str(Path(__file__).resolve().parent / "z4captures" / "interlaced" / "cap_*.pkl")))
 print(f"{'capture':28s} {'cam':>6s} {'fr':>3s} {'arcs/fr':>8s}  " + "  ".join(f"{k[:30]:>30s}" for k in RULES))
 for pkl in pkls:
     d = pickle.load(open(pkl, "rb"))

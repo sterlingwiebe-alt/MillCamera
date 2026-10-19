@@ -5,8 +5,9 @@ points. Shows whether an arc 'in the zone' actually has points there.
     python lidar/zone_arcs.py <cap.pkl> [zone] [frames]
 """
 import pickle, sys
+from pathlib import Path
 import numpy as np
-sys.path.insert(0, r"C:\Claude")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from lidar.flow_track import FlowTracker, PRES_R_LO, PRES_R_HI   # noqa: E402
 from lidar.arcfit import zone_round_runs                            # noqa: E402
 
