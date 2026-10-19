@@ -42,9 +42,15 @@ DECK_EVERY = 4          # full-deck inventory (for the live view) every N frames
 PRES_HIST = 5           # presence smoothing: last N inventory frames (~1 s)
 PRES_MIN_HITS = 2       # present if >= this many of them had enough arcs
 PRES_MIN_ARCS = {"7_InfeedDeck": 2,   # far field is sparse; default 3 arcs/frame
-                 "2_CamWaiting": 1}   # cam-waiting station: the sensor sees only 1-2 arcs of
-                                      # a log there (far downstream edge of its view), so
-                                      # zone 2 relies on PERSISTENCE instead of count
+                 "2_CamWaiting": 2}   # cam-waiting station: few arcs of a log there (far
+                                      # downstream edge of the view), so zone 2 relies on
+                                      # PERSISTENCE more than count. Was 1: with the zone
+                                      # empty, fixed structures at the band edges (y ~-1.73,
+                                      # dia 400-560, and y ~-1.97) jitter single 5-6 point
+                                      # arcs into the gates and lit the zone 42 % of the
+                                      # time (burst cap_01_134722, 2026-10-19). 2 arcs: 0 %
+                                      # there, and the 2026-10-15 at-rest captures with a
+                                      # log in zone 2 (5-8 arcs/frame) are unchanged.
 PRES_MIN_HITS_Z = {"2_CamWaiting": 3, # ...present if 3 of the last 5 frames had an arc
                    "4_TopOfScrew": 1} # zone 4: on with 1 frame, off after 2 empty (0.4 s)
 PRES_HIST_Z = {"4_TopOfScrew": 2}     # zone 4 keeps only the last 2 inventory frames so
