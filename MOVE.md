@@ -144,6 +144,18 @@ up the PLC output and http://<pc>:8200 are back. To run the tools by hand
 instead, stop the task first (two capture tools would fight over UDP 2115
 and both write the PLC).
 
+Note: `interlace_capture.py` has a `--duration` default of 6 hours, after
+which it exits normally; the supervisor passes `--duration 315360000` (10
+years) so it runs until stopped. Before that fix (2026-10-19) the tool
+restarted itself every 6 h (5 s gap in PLC output, pass counter and
+pairing window reset). Because the supervisor restarts the tool from the
+files on disk, ANY code change becomes live at the next restart, planned
+or not: pull/edit on the mill PC only what is meant to run.
+
+While the LiDAR stream is absent (sensor off), the SICK library prints a
+timeout traceback every second to `capture_console.err.log` (1-2 MB per
+hour of outage); harmless, the tool keeps waiting.
+
 Signs to look for: `capture_console.log` shows "flow mode ON", "PLC OUT:
 writing Vision_Transport[0..39]" and "ARMED on 'Vision_Capture'"; the live
 view's LiDAR state is not marked stale; `Vision_Transport[0]` (fresh flag)
@@ -202,6 +214,9 @@ Verified on this PC:
 
 NOT yet verified:
 
+- (Verified 2026-10-19, first production day: ~1100 passes, five zones
+  active, state age median 0.10 s / p90 0.19 s / max 0.40 s over 60 s
+  samples, none over 0.5 s. The PC keeps up with the optimised tracker.)
 - The tracker under load: the 2026-10-17 runs only saw an idle deck.
   With logs moving the tracker needs more of its core and competes with
   the packet parser for the interpreter lock, so lag may creep back until

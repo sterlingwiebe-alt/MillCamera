@@ -97,7 +97,9 @@ function Rotate($path) {
 # On a PC with fewer than 4 logical CPUs no affinity is set.
 $ncpu = [Environment]::ProcessorCount
 $procs = @(
-    @{ name = "capture"; args = @("lidar\interlace_capture.py", "--ack", "--plc-out")
+    # --duration: the tool's own default is 6 h, after which it exits and the
+    # supervisor restarts it (5 s gap, pass counter/pairing reset); 10 years
+    @{ name = "capture"; args = @("lidar\interlace_capture.py", "--ack", "--plc-out", "--duration", "315360000")
        out = "$dump\capture_console.log"; err = "$dump\capture_console.err.log"
        prio = "AboveNormal"; affinity = $(if ($ncpu -ge 4) { 0x3 } else { 0 })
        proc = $null; fails = 0; last = $null }
