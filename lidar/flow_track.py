@@ -321,8 +321,14 @@ class FlowTracker:
                     # lobes sweeping: only a clearly log-shaped object counts
                     # (cam dwells ~1 s at 130-140 deg, rotates the rest of the
                     # cycle, so without this the cam zones would be amber most
-                    # of the time the line runs)
-                    if lg["height_mm"] >= CAM_LOG_H_MOVING and 190 <= lg["dia_arc_mm"] <= WALL_DIA:
+                    # of the time the line runs). Zone 3: never an object
+                    # centred at the parked lobe's spot (y > Z3_LOBE_Y): with
+                    # the servo reading 20.6 deg at rest (2026-10-19) the lobe
+                    # at y -1.04..-1.11, height 97-106 mm, flickered zone 3
+                    # present every few seconds. Staged logs sit at -1.18..-1.28.
+                    lobe_spot = z == "3_CamStaging" and lg["center"][1] > Z3_LOBE_Y
+                    if (not lobe_spot and lg["height_mm"] >= CAM_LOG_H_MOVING
+                            and 190 <= lg["dia_arc_mm"] <= WALL_DIA):
                         zones[z] = {"present": True, "dia": lg["dia_arc_mm"], "arcs": lg["n_arcs"],
                                     "y": round(lg["center"][1], 2), "h": lg["height_mm"],
                                     "src": "detect+cam"}
