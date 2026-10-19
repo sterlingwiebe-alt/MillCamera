@@ -200,3 +200,64 @@ IPv6-first connect timeout against a server bound to `0.0.0.0`; use
   would be deterministic and usually better, but ties/misses differ).
 - One-off: the first `detect_logs` call runs the pair-draw self-test
   (~60 ms).
+
+## SICK parser vectorised (2026-10-19)
+
+Option (1) from "First live run": `scansegmentapi/compact.py`
+`_read_beam_data` (struct.unpack_from per beam, element-wise assignment)
+is replaced by `lidar/fast_compact.py`: one `numpy.frombuffer` read per
+module with a packed structured dtype in the wire order (d0 r0 d1 r1 ...
+prop theta), each field transposed to (layers, beams) and converted to
+float64 once, then the same arithmetic per element as the original
+(`uint16 * DistanceScalingFactor`, `(theta - 16384) / 5215.0`, float64
+both times, so the results are the same IEEE operations on the same
+operands). Each layer's arrays are the contiguous rows of those matrices
+(same dtype, shape, C-contiguous and writeable as before; they share a
+base array instead of owning their memory, which nothing downstream
+depends on). Channels a module does not carry become NaN exactly as the
+original's `arr[i] = None` did. The package is not edited:
+`fast_compact.install()` monkey-patches the function into the module, and
+`interlace_capture.py live()` calls it before the receiver thread starts
+(`--no-fast-parse` keeps the package's parser for A/B runs). The
+metadata reader (`_read_meta_data`, ~1/3 of what is left) is untouched.
+
+Verification (`lidar/compact_check.py verify`): the original and the
+patched parser run on the same datagrams and the outputs are compared
+recursively, floats by bit pattern, plus container types, key order,
+dtypes, shapes and the C_CONTIGUOUS/WRITEABLE flags. Datagram sources:
+
+| source | segments | elements compared | mismatches |
+|---|---|---|---|
+| `cap_01_134722.pkl` (10-19), every stored segment serialised back to the Compact wire format by `compact_check.encode_segment` | 309 | 2,407,728 (and the encoder round-trip, stored segment vs original parser on the synthesised bytes: 0 mismatches) | 0 |
+| `cap_01_041611.pkl` + `cap_01_052913.pkl` (10-15), same way | 754 | 5,875,168 | 0 |
+| random layouts: 1-3 echoes, 1-16 layers, 1-120 beams, rssi / theta / properties present or absent, scaling factors 0.001-2, random 16-bit values incl. 0 and 65535 | 800 | ~3.9 M | 0 |
+| raw dump file written through the new hook (25 datagrams, read back byte-identical) | 25 | 194,800 | 0 |
+
+12.35 M elements in all, identical. Real sensor datagrams were not yet
+available without binding the sensor's port: the supervised tool holds
+it. `interlace_capture.py` now records the first 240 datagrams verbatim
+to `<dump>/raw_payloads.bin` at every start (`--raw-dump N`, 0 = off,
+3.6 MB, overwritten), so after the next restart
+`python lidar/compact_check.py verify --raw lidar/z4captures/interlaced/raw_payloads.bin`
+repeats the check on the real thing (see below).
+
+Parse time on this PC (`compact_check.py bench`, `cap_01_134722.pkl`:
+309 segments, 26 frames, 960 beams and 2 modules per segment, best of 5,
+taken with the live tool running at ~100 % of a core on CPUs 0-1):
+
+| | per segment | per frame (11.9 segments) |
+|---|---|---|
+| original `_read_beam_data` | 5015 us | 59.6 ms |
+| `fast_compact` | 391 us | 4.65 ms |
+| speed-up | 12.8x | |
+
+cProfile of the patched path: 56 % in `_read_beam_data` (astype and the
+per-layer row views), 35 % in the package's `_read_meta_data` (17 small
+int.from_bytes / struct reads per module), rest `parse_payload` plumbing.
+
+Live, before (old parser, pid 4328 started 13:57:56, 120 s at 5 Hz,
+2026-10-19 14:29): interpreter CPU 99.3 % of a core; published state age
+median 0.43 s, p90 1.50 s, max 2.61 s, 115 of 558 samples over 1 s.
+
+Live, after: pending the MillCamera restart (the supervised instance
+runs the old code until then); numbers to be added here.

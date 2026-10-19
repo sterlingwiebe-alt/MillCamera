@@ -418,6 +418,17 @@ def live(args):
     dump = Path(args.dump); dump.mkdir(parents=True, exist_ok=True)
     csv_path = dump / "interlaced.csv"
     new = not csv_path.exists()
+    # SICK Compact parser: the vectorised _read_beam_data (lidar/fast_compact.py,
+    # bit-identical output, ~13x cheaper) is patched into scansegmentapi before
+    # the receiver thread starts. The first --raw-dump datagrams are recorded
+    # verbatim for lidar/compact_check.py (overwritten on every start).
+    from lidar import fast_compact
+    raw_path = dump / "raw_payloads.bin" if args.raw_dump > 0 else None
+    fast_compact.install(fast=not args.no_fast_parse, raw_dump=raw_path,
+                         raw_count=args.raw_dump)
+    print(f"SICK parser: {'ORIGINAL (--no-fast-parse)' if args.no_fast_parse else 'fast (lidar/fast_compact.py)'}"
+          + (f"; recording the first {args.raw_dump} datagrams -> {raw_path}" if raw_path else ""),
+          flush=True)
     buf = FrameBuffer()
     threading.Thread(target=buf.run, args=(args.port,), daemon=True).start()
     tap = OptimizerTap(args.ip, args.slot, dump)
@@ -510,6 +521,12 @@ def main():
     ap.add_argument("--duration", type=float, default=6 * 3600)
     ap.add_argument("--dump", default="lidar/z4captures/interlaced")
     ap.add_argument("--replay", default="")
+    ap.add_argument("--no-fast-parse", action="store_true",
+                    help="use the scansegmentapi package's own beam parser instead of "
+                         "lidar/fast_compact.py (A/B timing only; same output)")
+    ap.add_argument("--raw-dump", type=int, default=240, metavar="N",
+                    help="record the first N sensor datagrams verbatim to <dump>/raw_payloads.bin "
+                         "at start-up, the verification set for lidar/compact_check.py (0 = off)")
     ap.add_argument("--no-flow", action="store_true",
                     help="disable continuous flow-mode pass tracking")
     ap.add_argument("--plc-out", action="store_true",
