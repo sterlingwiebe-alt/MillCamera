@@ -335,7 +335,14 @@ class FlowTracker:
                     # at y -1.04..-1.11, height 97-106 mm, flickered zone 3
                     # present every few seconds. Staged logs sit at -1.18..-1.28.
                     lobe_spot = z == "3_CamStaging" and lg["center"][1] > Z3_LOBE_Y
-                    if (not lobe_spot and lg["height_mm"] >= CAM_LOG_H_MOVING
+                    # Zone 2: the window must agree, as the at-rest rule below
+                    # demands. The segmenter builds a "log" from the same
+                    # cross-border flank arcs the window now rejects (2026-10-19:
+                    # 300 mm, 145 mm high, centred y -1.47, with zone 2 empty).
+                    no_window = (z == "2_CamWaiting"
+                                 and not getattr(self, "presence", {}).get(z, {}).get("present"))
+                    if (not lobe_spot and not no_window
+                            and lg["height_mm"] >= CAM_LOG_H_MOVING
                             and 190 <= lg["dia_arc_mm"] <= WALL_DIA):
                         zones[z] = {"present": True, "dia": lg["dia_arc_mm"], "arcs": lg["n_arcs"],
                                     "y": round(lg["center"][1], 2), "h": lg["height_mm"],
