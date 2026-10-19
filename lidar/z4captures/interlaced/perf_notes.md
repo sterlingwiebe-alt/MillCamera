@@ -233,13 +233,15 @@ dtypes, shapes and the C_CONTIGUOUS/WRITEABLE flags. Datagram sources:
 | random layouts: 1-3 echoes, 1-16 layers, 1-120 beams, rssi / theta / properties present or absent, scaling factors 0.001-2, random 16-bit values incl. 0 and 65535 | 800 | ~3.9 M | 0 |
 | raw dump file written through the new hook (25 datagrams, read back byte-identical) | 25 | 194,800 | 0 |
 
-12.35 M elements in all, identical. Real sensor datagrams were not yet
-available without binding the sensor's port: the supervised tool holds
-it. `interlace_capture.py` now records the first 240 datagrams verbatim
-to `<dump>/raw_payloads.bin` at every start (`--raw-dump N`, 0 = off,
-3.6 MB, overwritten), so after the next restart
-`python lidar/compact_check.py verify --raw lidar/z4captures/interlaced/raw_payloads.bin`
-repeats the check on the real thing (see below).
+12.35 M elements in all, identical. Real sensor datagrams could not be
+captured by this session beforehand (the supervised tool holds the
+sensor's port), so `interlace_capture.py` now records the first 240
+datagrams verbatim to `<dump>/raw_payloads.bin` at every start
+(`--raw-dump N`, 0 = off, 3.6 MB, overwritten). After the restart below:
+
+| source | segments | elements compared | mismatches |
+|---|---|---|---|
+| `raw_payloads.bin`, real datagrams of the restarted tool (14:36, deck in production), `compact_check.py verify --raw` | 240 (21 frames) | 1,870,080 | 0 |
 
 Parse time on this PC (`compact_check.py bench`, `cap_01_134722.pkl`:
 309 segments, 26 frames, 960 beams and 2 modules per segment, best of 5,
@@ -251,6 +253,10 @@ taken with the live tool running at ~100 % of a core on CPUs 0-1):
 | `fast_compact` | 391 us | 4.65 ms |
 | speed-up | 12.8x | |
 
+Same bench on the 240 real datagrams (`--raw`, 11.4 segments/frame, taken
+after the restart with the new tool at ~50 % of a core): original 4334 us
+/ 49.5 ms per frame, fast 276 us / 3.15 ms, 15.7x.
+
 cProfile of the patched path: 56 % in `_read_beam_data` (astype and the
 per-layer row views), 35 % in the package's `_read_meta_data` (17 small
 int.from_bytes / struct reads per module), rest `parse_payload` plumbing.
@@ -259,5 +265,20 @@ Live, before (old parser, pid 4328 started 13:57:56, 120 s at 5 Hz,
 2026-10-19 14:29): interpreter CPU 99.3 % of a core; published state age
 median 0.43 s, p90 1.50 s, max 2.61 s, 115 of 558 samples over 1 s.
 
-Live, after: pending the MillCamera restart (the supervised instance
-runs the old code until then); numbers to be added here.
+Live, after (restart via the supervisor at 14:36:58 with the user's go-ahead,
+deck in production; pid 13036, sampled 14:37:40-14:39:40, 120 s at 5 Hz):
+interpreter CPU 53.2 % of a core; state age median 0.10 s, p90 0.18 s,
+max 0.48 s, 0 of 562 samples over 1 s. No errors in capture_console.err.log.
+
+| | before | after |
+|---|---|---|
+| capture tool CPU (% of a core) | 99.3 | 53.2 |
+| state age median / p90 / max | 0.43 / 1.50 / 2.61 s | 0.10 / 0.18 / 0.48 s |
+| samples over 1 s | 115 of 558 | 0 of 562 |
+
+Both samples: CPU from the child interpreter's TotalProcessorTime over
+the interval, age = now - mtime of live_state.json. The before sample had
+the deck idle-to-starting (14:29), the after sample a running deck, so
+the after figure carries more tracker work, not less. The GIL budget is
+now parser ~5 % + tracker, so the stalls that the "Live view contention"
+section worried about have the parser's old 45 % as margin.
